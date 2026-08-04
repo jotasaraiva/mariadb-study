@@ -39,9 +39,8 @@ def _as_multipolygon(geometry: gpd.GeoSeries) -> gpd.GeoSeries:
 
 
 def _to_nullable_numeric(df: pd.DataFrame, columns: list[str]) -> None:
-    # INPE uses sentinels like -999 for fields it couldn't compute (e.g.
-    # risco_fogo, numero_dias_sem_chuva); all of these columns are physically
-    # non-negative, so any negative value is treated as missing data.
+    # Dados inválidos (como precipitação negativa) são convertidos para None, 
+    # e colunas numéricas são convertidas para object dtype para permitir valores nulos.
     for col in columns:
         series = pd.to_numeric(df[col], errors="coerce")
         series = series.mask(series < 0)
@@ -91,19 +90,17 @@ def load_municipios() -> None:
     municipios["geocodigo_ibge"] = municipios["geocodigo_ibge"].astype(int)
     municipios["geometry"] = _as_multipolygon(municipios["geometry"])
 
-    # The IBGE municipality code is prefixed with the state's own IBGE code
-    # (e.g. 1501956 -> state 15), so estado_id can be derived without a
-    # separate sigla/UF column.
+    # Municípios no IBGE tem o estado embutido no código IBGE, 
+    # então podemos derivar o estado_id a partir do geocódigo.
     municipios["codigo_ibge"] = municipios["geocodigo_ibge"] // 100000
     estados = pd.read_sql("SELECT id AS estado_id, codigo_ibge FROM estados", con=engine)
-    municipios = municipios.merge(estados, on="codigo_ibge", how="left").drop(
-        columns=["codigo_ibge"]
-    )
+    municipios = municipios.merge(estados, on="codigo_ibge", how="left").drop(columns=["codigo_ibge"])
 
     unmatched = municipios["estado_id"].isna()
     if unmatched.any():
         print(f"dropping {unmatched.sum()} municipios with no matching estado")
         municipios = municipios[~unmatched]
+        
     municipios["estado_id"] = municipios["estado_id"].astype(int)
 
     municipios.to_sql(
@@ -138,8 +135,7 @@ def load_focos_de_fogo() -> None:
     focos["data_pas"] = focos["data_pas"].dt.date
     _to_nullable_numeric(focos, ["precipitacao", "dias_sem_chuva", "risco_fogo", "frp"])
 
-    # Fire detections only report municipality/state by name, so municipio_id
-    # is resolved via a name lookup instead of the IBGE geocode.
+    # Faz JOIN de municípios pelo nome
     municipios = pd.read_sql(
         """
         SELECT m.id AS municipio_id, m.nome AS municipio, e.nome AS estado
