@@ -1,0 +1,17 @@
+[project]
+name = "mariadb-study"
+version = "0.1.0"
+description = "Study on mariadb"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "alembic>=1.18.5",
+    "geoalchemy2>=0.20.0",
+    "geopandas>=1.1.4",
+    "ipykernel>=7.3.0",
+    "leafmap>=0.63.1",
+    "pandas>=3.0.5",
+    "pymysql>=1.2.0",
+    "python-dotenv>=1.2.2",
+    "sqlalchemy>=2.0.51",
+]
